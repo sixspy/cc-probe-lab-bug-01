@@ -5,44 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>栏规 · 探栏</title>
   <link rel="stylesheet" href="/styles.css"/>
-  <script src="/common.js">
-    async function 刷栏规页() {
-      const 规 = await 探栏.getJSON("/api/栏规");
-      const box = document.getElementById("栏规表") || document.getElementById("表");
-      if (box && box.tagName === "TBODY") {
-        box.innerHTML = "";
-        for (const [k,v] of Object.entries(规)) {
-          box.appendChild(探栏.行(`<td>${探栏.安全文本(k)}</td><td>${探栏.安全文本(v)}</td>`));
-        }
-      }
-      const checks = await 探栏.getJSON("/api/夹具/预检");
-      const tb = document.getElementById("夹具预检表");
-      if (tb) {
-        tb.innerHTML = "";
-        for (const c of checks) {
-          tb.appendChild(探栏.行(`<td>${探栏.安全文本(c.夹具)}</td><td>${c.报文数}</td><td>${c.是否可装?"是":"否"}</td><td>${探栏.安全文本(c.摘要||"—")}</td>`));
-        }
-      }
-    }
-    const saveBtn = document.getElementById("保存栏规");
-    if (saveBtn) {
-      saveBtn.onclick = async () => {
-        const el = document.getElementById("栏规回执");
-        try {
-          const body = {
-            "PM25上限": document.getElementById("PM25上限")?.value,
-            "PM25下限": document.getElementById("PM25下限")?.value,
-          };
-          Object.keys(body).forEach((k) => body[k] === undefined && delete body[k]);
-          el.textContent = JSON.stringify(await 探栏.postJSON("/api/栏规", body), null, 2);
-          await 刷栏规页();
-        } catch (e) { el.textContent = String(e); }
-      };
-    }
-    const refreshBtn = document.getElementById("刷新栏规");
-    if (refreshBtn) refreshBtn.onclick = () => 刷栏规页();
-    刷栏规页();
-  </script>
+  <script src="/common.js"></script>
 </head>
 <body>
   <div class="壳">
@@ -51,16 +14,36 @@
       <div class="骨">传感报文装载 → 标定/质控门槛入栏 → 站点汇总物化 → 坏点旁路 → 栏账互证<br/>皮：环境监测传感站 · 不是潮切关窗，也不是对拍双轨</div>
     </header>
     <div class="门槛条" id="门槛条"></div>
+    <div class="门槛条" id="发布版本条"></div>
     <header class="顶牌" style="margin-bottom:10px">
       <h1 style="font-size:22px">栏规</h1>
-      <div class="骨">当前栏号与质控阈值。</div>
+      <div class="骨">现行阈取自发布凭证指向的已发布阈集；草稿只存草稿台，发布后才换读轨。</div>
     </header>
 
-    <section class="卷"><h2>栏规原文</h2><pre class="回执" id="规">加载中…</pre><div class="工具 上距12">
-        <button class="按钮" id="保存栏规">保存栏规补丁</button>
+    <section class="卷">
+      <h2>发布版本</h2>
+      <pre class="回执" id="对账">加载中…</pre>
+    </section>
+
+    <section class="卷">
+      <h2>现行栏规（装载/校验/结栏唯一读源）</h2>
+      <div class="表绕"><table><thead><tr><th>键</th><th>现行值（已发布）</th></tr></thead><tbody id="现行表"></tbody></table></div>
+    </section>
+
+    <section class="卷">
+      <h2>草稿栏规（未发布，不进现行）</h2>
+      <div class="表绕"><table><thead><tr><th>键</th><th>草稿值</th></tr></thead><tbody id="草稿表"></tbody></table></div>
+      <p class="说明" id="草稿态"></p>
+    </section>
+
+    <section class="卷"><h2>栏规补丁（先进草稿）</h2><pre class="回执" id="规">加载中…</pre><div class="工具 上距12">
+        <label>PM25上限 <input id="PM25上限" placeholder="如 50"/></label>
+        <label>PM25下限 <input id="PM25下限" placeholder="如 0"/></label>
+        <button class="按钮" id="保存栏规">存草稿</button>
+        <button class="按钮 青" id="发布栏规">发布草稿</button>
         <button class="按钮 次" id="刷新栏规">刷新</button>
       </div>
-      <pre class="回执 上距12" id="栏规回执">改门槛只影响后续装载</pre>
+      <pre class="回执 上距12" id="栏规回执">改门槛只影响发布后的后续装载</pre>
     </section>
     <section class="卷">
       <h2>夹具预检</h2>
@@ -71,11 +54,62 @@
       <div class="侧注">版式：底栏铜青。潮切是左侧窗时间轴浅纸底。</div></div>
     </section>
     <script>
-    (async () => {
-      document.getElementById("规").textContent = JSON.stringify(await 探栏.getJSON("/api/栏规"), null, 2);
-      const s = await 探栏.getJSON("/api/空桩");
-      document.getElementById("空桩").textContent = "空桩 " + s.条数 + "：" + (s.空桩 || []).join(" · ");
-    })();
+    async function 刷栏规页() {
+      const [规, 草, 对账, checks] = await Promise.all([
+        探栏.getJSON("/api/栏规"),
+        探栏.getJSON("/api/栏规/草稿"),
+        探栏.getJSON("/api/阈版本/对账"),
+        探栏.getJSON("/api/夹具/预检"),
+      ]);
+      document.getElementById("规").textContent = JSON.stringify(规, null, 2);
+      document.getElementById("对账").textContent = JSON.stringify(对账, null, 2);
+      const 现行 = document.getElementById("现行表");
+      现行.innerHTML = "";
+      for (const [k, v] of Object.entries(规)) {
+        现行.appendChild(探栏.行(`<td>${探栏.安全文本(k)}</td><td>${探栏.安全文本(v)}</td>`));
+      }
+      const 草稿体 = document.getElementById("草稿表");
+      草稿体.innerHTML = "";
+      const 草稿键 = Object.keys(草).filter((k) => 草[k] !== 规[k]);
+      if (!草稿键.length) {
+        草稿体.innerHTML = `<tr><td colspan="2">${探栏.空态("无挂起草稿。")}</td></tr>`;
+      } else {
+        for (const k of 草稿键) {
+          草稿体.appendChild(探栏.行(`<td>${探栏.安全文本(k)}</td><td>${探栏.安全文本(草[k])} <span class="徽章 警">草稿待发布</span></td>`));
+        }
+      }
+      document.getElementById("草稿态").textContent = 对账["有未发布草稿"]
+        ? "存在未发布草稿：现行装载仍按 " + 对账["现行版本"] + " 分流。"
+        : "草稿与现行一致，读轨齐套。";
+      const tb = document.getElementById("夹具预检表");
+      tb.innerHTML = "";
+      for (const c of checks) {
+        tb.appendChild(探栏.行(`<td>${探栏.安全文本(c.夹具)}</td><td>${c.报文数}</td><td>${c.是否可装?"是":"否"}</td><td>${探栏.安全文本(c.摘要||"—")}</td>`));
+      }
+      探栏.渲染发布版本(document.getElementById("发布版本条"));
+    }
+    const saveBtn = document.getElementById("保存栏规");
+    saveBtn.onclick = async () => {
+      const el = document.getElementById("栏规回执");
+      try {
+        const body = {
+          "PM25上限": document.getElementById("PM25上限")?.value,
+          "PM25下限": document.getElementById("PM25下限")?.value,
+        };
+        Object.keys(body).forEach((k) => (body[k] === undefined || body[k] === "") && delete body[k]);
+        el.textContent = JSON.stringify(await 探栏.postJSON("/api/栏规", body), null, 2);
+        await 刷栏规页();
+      } catch (e) { el.textContent = String(e); }
+    };
+    document.getElementById("发布栏规").onclick = async () => {
+      const el = document.getElementById("栏规回执");
+      try {
+        el.textContent = JSON.stringify(await 探栏.postJSON("/api/阈版本/发布", {}), null, 2);
+        await 刷栏规页();
+      } catch (e) { el.textContent = String(e); }
+    };
+    document.getElementById("刷新栏规").onclick = () => 刷栏规页();
+    刷栏规页();
     </script>
 
   </div>
@@ -96,6 +130,9 @@
     try {
       const o = await 探栏.getJSON("/api/概览");
       探栏.渲染门槛(document.getElementById("门槛条"), o.栏规 || {});
+      探栏.渲染发布版本(document.getElementById("发布版本条"));
+      const s = await 探栏.getJSON("/api/空桩");
+      document.getElementById("空桩").textContent = "空桩 " + s.条数 + "：" + (s.空桩 || []).join(" · ");
     } catch (e) {}
   })();
   </script>

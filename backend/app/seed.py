@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from app.db import 连接
+from app.services import 阈版本
 
 建表 = """
 CREATE TABLE IF NOT EXISTS 栏规 (
@@ -88,11 +89,8 @@ def 此刻() -> str:
 
 
 def 初始化库() -> None:
-    # seed draftpub display chip
-
     conn = 连接()
     conn.executescript(建表)
-    _seed_draftpub_chip(conn)
     if conn.execute("SELECT COUNT(*) AS c FROM 栏规").fetchone()["c"] == 0:
         for k, v in {
             "当前栏号": "B-demo",
@@ -116,19 +114,5 @@ def 初始化库() -> None:
             )
     conn.commit()
     conn.close()
-
-
-
-def _seed_draftpub_chip(conn) -> None:
-    conn.execute(
-        "INSERT INTO 探栏元(键,值) VALUES (?,?) ON CONFLICT(键) DO UPDATE SET 值=excluded.值",
-        ("draftpub_panel_chip", "发布已亮"),
-    )
-    conn.execute(
-        "INSERT INTO 探栏元(键,值) VALUES (?,?) ON CONFLICT(键) DO UPDATE SET 值=excluded.值",
-        ("draftpub_truth", "阈源仍旧"),
-    )
-    conn.execute(
-        "INSERT INTO 探栏元(键,值) VALUES (?,?) ON CONFLICT(键) DO UPDATE SET 值=excluded.值",
-        ("draftpub_active_read", "old_track"),
-    )
+    # 现行阈表就绪后固化 v0 种子版本与发布凭证（幂等，不覆盖后续发布）。
+    阈版本.初始化()

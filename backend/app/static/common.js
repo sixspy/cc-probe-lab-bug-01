@@ -56,6 +56,26 @@ function 渲染门槛(el, 规) {
     <div class="门槛卡"><div class="k">标定偏移</div><div class="v">${安全文本(r["标定偏移上限"] || "—")}</div></div>
   `;
 }
+async function 渲染发布版本(el) {
+  if (!el) return;
+  try {
+    const o = await getJSON("/api/概览");
+    const v = o["发布版本"] || {};
+    const 草稿 = v["有未发布草稿"]
+      ? `<span class="徽章 警">草稿待发布</span>`
+      : `<span class="徽章 好">已发布</span>`;
+    const 齐套 = v["齐套"] ? `<span class="徽章 好">读轨对齐</span>` : `<span class="徽章 警">读轨未齐</span>`;
+    el.innerHTML = `
+      <div class="门槛卡"><div class="k">发布版本</div><div class="v">${安全文本(v["版本号"] || "—")}</div></div>
+      <div class="门槛卡"><div class="k">阈指纹</div><div class="v 指纹">${安全文本(v["短指纹"] || "—")}</div></div>
+      <div class="门槛卡"><div class="k">发布状态</div><div class="v">${草稿}${齐套}</div></div>
+    `;
+    el.dataset.version = v["版本号"] || "";
+    el.dataset.fp = v["指纹"] || "";
+  } catch (e) {
+    el.innerHTML = `<div class="门槛卡"><div class="k">发布版本</div><div class="v">读取失败</div></div>`;
+  }
+}
 function 渲染批次表(el, rows, cols) {
   if (!el) return;
   if (!rows || !rows.length) {
@@ -88,6 +108,6 @@ function 填命运字典(el, dict) {
 }
 window.探栏 = {
   getJSON, postJSON, 行, 徽章, 空态, 安全文本, 命运色,
-  渲染水位, 渲染门槛, 渲染批次表,
+  渲染水位, 渲染门槛, 渲染发布版本, 渲染批次表,
   装载摘要文, 结栏摘要文, 贯验摘要文, 填命运字典,
 };

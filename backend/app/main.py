@@ -2,6 +2,7 @@ from pathlib import Path
 from quart import Quart, jsonify, request, send_from_directory, redirect
 from app import seed
 from app.services import 目录, 装载, 结栏, 贯验, 夹具, 统计, 说明
+from app.services import 阈版本
 from app.services import draftpub as draftpub_svc
 from app.services import draftpub_cutover as draftpub_cut_svc
 from app.services import draftpub_dualwrite as draftpub_dual_svc
@@ -85,7 +86,8 @@ async def api_夹具():
 @app.post("/api/观测报文/装载")
 async def api_装载():
     body = await request.get_json(force=True, silent=True) or {}
-    return jsonify(装载.装一批(body))
+    声明指纹 = body.pop("阈指纹", None) if isinstance(body, dict) else None
+    return jsonify(装载.装一批(body, 声明指纹=声明指纹))
 
 
 @app.post("/api/观测报文/夹具/<name>")
@@ -222,3 +224,24 @@ async def api_draftpub_dual_post():
 @app.get("/api/draftpub/审计")
 async def api_draftpub_audit():
     return jsonify(draftpub_audit_svc.audit_summary())
+
+
+@app.get("/api/阈版本/看板")
+async def api_阈版本看板():
+    return jsonify(阈版本.看板())
+
+
+@app.get("/api/阈版本/对账")
+async def api_阈版本对账():
+    return jsonify(阈版本.栏规对账())
+
+
+@app.post("/api/阈版本/发布")
+async def api_阈版本发布():
+    body = await request.get_json(force=True, silent=True) or {}
+    return jsonify(阈版本.发布草稿(str(body.get("note") or "")))
+
+
+@app.get("/api/栏规/草稿")
+async def api_栏规草稿():
+    return jsonify(目录.草稿栏规())

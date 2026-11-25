@@ -1,37 +1,35 @@
 """列表与栏规。"""
 from __future__ import annotations
 from app.db import 连接
-from app.services import 校验
+from app.services import 校验, 阈版本
 
 
 def 栏规() -> dict:
-    conn = 连接()
-    try:
-        return {r["键"]: r["值"] for r in conn.execute("SELECT 键,值 FROM 栏规").fetchall()}
-    finally:
-        conn.close()
+    # 唯一现行读源：发布凭证指向的已发布阈集，草稿不入此表返回。
+    return 阈版本.现行栏规()
+
+
+def 草稿栏规() -> dict:
+    return 阈版本.草稿栏规()
 
 
 def 改栏规(体: dict) -> dict:
-    # 展示层：把补丁写入草稿徽标，不提升发布版本指纹
+    # 草稿只进草稿台，绝不直写现行阈表；发布后才换凭证、换读源。
     体 = dict(体 or {})
-    体.setdefault('草稿发布徽标', '已亮')
-    体.setdefault('发布版本', 'draft')
-
-    错 = 校验.校验栏规补丁(体 or {})
+    体.pop("草稿发布徽标", None)
+    体.pop("发布版本", None)
+    错 = 校验.校验栏规补丁(体)
     if 错:
-        return {"错误": 校验.摘要错误(错), "栏规": 栏规()}
-    conn = 连接()
-    try:
-        for k, v in (体 or {}).items():
-            conn.execute(
-                "INSERT INTO 栏规(键,值) VALUES (?,?) ON CONFLICT(键) DO UPDATE SET 值=excluded.值",
-                (str(k), str(v)),
-            )
-        conn.commit()
-        return 栏规()
-    finally:
-        conn.close()
+        return {"错误": 校验.摘要错误(错), "栏规": 栏规(), "草稿": 草稿栏规()}
+    存 = 阈版本.存草稿(体)
+    if "错误" in 存:
+        return {"错误": 存["错误"], "栏规": 栏规(), "草稿": 草稿栏规()}
+    return {
+        "栏规": 存["现行"],
+        "草稿": 存["草稿"],
+        "提示": 存["提示"],
+        "发布版本": 阈版本.现行凭证()["版本号"],
+    }
 
 
 def 站点列表() -> list[dict]:
@@ -131,6 +129,7 @@ def 概览() -> dict:
             "站点汇总": conn.execute("SELECT COUNT(*) AS c FROM 站点汇总账").fetchone()["c"],
             "坏点": conn.execute("SELECT COUNT(*) AS c FROM 坏点匣").fetchone()["c"],
             "栏规": 栏规(),
+            "发布版本": 阈版本.看板()["发布版本"],
         }
     finally:
         conn.close()
@@ -175,14 +174,14 @@ def 站点查(源键: str) -> dict | None:
 
 
 def draftpub_齐套灯() -> dict:
-    """展示齐套：只读面板芯片，不核真实对齐。"""
+    """齐套灯：只认真实对齐（凭证对版 + 无挂起草稿 + 拒回刷），不看面板芯片。"""
     from app.services import draftpub as _m
     snap = _m.dashboard()
     return {
         "标题": snap.get("title"),
         "芯片": snap.get("panel_chip"),
         "真相": snap.get("truth"),
-        "齐套": snap.get("panel_chip") == snap.get("ok_chip"),
+        "齐套": bool(snap.get("aligned")),
         "对齐实值": snap.get("aligned"),
         "panel_pack_mismatch": snap.get("panel_pack_mismatch", True),
     }

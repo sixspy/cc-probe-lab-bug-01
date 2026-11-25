@@ -50,6 +50,8 @@ a { color: var(--teal); text-decoration: none; }
 }
 .门槛卡 .k { color: var(--copper-soft); font-size: 11px; letter-spacing: 0.08em; }
 .门槛卡 .v { margin-top: 6px; font-family: var(--display); font-size: 18px; font-weight: 700; }
+.门槛卡 .v.指纹 { font-size: 13px; font-weight: 400; word-break: break-all; }
+.门槛卡 .v .徽章 { margin-right: 6px; }
 .卷 {
   background: var(--panel);
   border: 1px solid var(--line);

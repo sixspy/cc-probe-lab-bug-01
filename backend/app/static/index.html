@@ -14,6 +14,7 @@
       <div class="骨">传感报文装载 → 标定/质控门槛入栏 → 站点汇总物化 → 坏点旁路 → 栏账互证<br/>皮：环境监测传感站 · 不是潮切关窗，也不是对拍双轨</div>
     </header>
     <div class="门槛条" id="门槛条"></div>
+    <div class="门槛条" id="发布版本条"></div>
     <header class="顶牌" style="margin-bottom:10px">
       <h1 style="font-size:22px">探栏台</h1>
       <div class="骨">底栏切换页面；右侧动作验主链。去皮是质控门槛入栏，不是事件时关窗。</div>
@@ -56,6 +57,7 @@
       const o = await 探栏.getJSON("/api/概览");
       探栏.渲染水位(document.getElementById("水位"), o);
       探栏.渲染门槛(document.getElementById("门槛条"), o.栏规 || {});
+      探栏.渲染发布版本(document.getElementById("发布版本条"));
       const loads = await 探栏.getJSON("/api/装载批次");
       探栏.渲染批次表(document.getElementById("装载批次表"), loads, ["编号","时刻","入流","入栏","坏点"]);
       const closes = await 探栏.getJSON("/api/结栏批次");
@@ -93,10 +95,9 @@
     try {
       const o = await 探栏.getJSON("/api/概览");
       探栏.渲染门槛(document.getElementById("门槛条"), o.栏规 || {});
+      探栏.渲染发布版本(document.getElementById("发布版本条"));
     } catch (e) {}
   })();
   </script>
-<div id="data-draftpub" data-chip="发布已亮" data-title="草稿阈发布" style="display:none"></div>
-<script>window.__draftpub_chip="发布已亮";</script>
 </body>
 </html>
